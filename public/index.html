@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta content="text/html; charset=UTF-8" http-equiv="content-type">
+  <link rel="icon" href="favicon.ico">
+  <title>Voice Commands</title>
+  <style>
+    body {
+      font-family: Helvetica, Arial, sans-serif;
+    }
+    .outputInter {
+      border: 1px solid red;
+      height: "20px";
+    }
+    .outputFinal {
+      border: 1px solid green;
+      height: "20px";
+    }
+  </style>
+</head>
+
+<body>
+  <h3>Interim transcript:</h3>
+  <div id="interimDiv">
+  </div>
+  <br>
+  <h3>Log</h3>
+  <div id="logDiv">
+  </div>
+</body>
+
+
+<script type="text/javascript" src="src/websocket.io.js"></script>
+<script type="text/javascript" src="src/wsioIndex.js"></script>
+
+<script type="text/javascript">
+
+
+// Setup websocket connection
+initializeWS();
+logDiv.innerHTML = "Initializing...<br>\n";
+
+var speechObj = {};
+speechObj.webkitSR = null;
+speechObj.final_transcript   = false;
+speechObj.interim_transcript = false;
+setTimeout(function() { speechObj.init(); }, 3000);
+
+speechObj.init = function() {
+  if (!("webkitSpeechRecognition" in window)) {
+    alert("Sorry your browser doesn't support webkitSpeechRecognition. You will need an updated Chrome browser.");
+  }
+  else {
+    this.webkitSR = new webkitSpeechRecognition();
+    this.webkitSR.continuous = true;
+    this.webkitSR.interimResults = true;
+
+    // add handlers before starting.
+    this.webkitSR.onstart = function() {
+      // logDiv.innerHTML = "Starting webkitSpeechRecognition<br>\n" + logDiv.innerHTML;
+    }
+
+    this.webkitSR.onresult = function(event) {
+      speechObj.interim_transcript = " ";
+      for (var i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          speechObj.final_transcript = event.results[i][0].transcript;
+          logDiv.innerHTML = "Final:" + speechObj.final_transcript + "<br>\n" + logDiv.innerHTML;
+
+          // TODO emit message
+          wsio.emit("speechSentence", {message:speechObj.final_transcript});
+
+          setTimeout(function(){
+            // logDiv.innerHTML = "restarting..." + "<br>\n" + logDiv.innerHTML;
+            speechObj.webkitSR.stop();
+          }, 10);
+        } else {
+          speechObj.interim_transcript += event.results[i][0].transcript;
+          interimDiv.innerHTML = speechObj.interim_transcript;
+        }
+      }
+    } //end onresult
+
+    this.webkitSR.onerror = function(e) {
+      logDiv.innerHTML = "webkitSpeechRecognition error " + e.error + ":" + e.message + "<br>\n" + logDiv.innerHTML;
+      if (e.error.indexOf("not") != -1 && e.error.indexOf("allowed") != -1) {
+        logDiv.innerHTML = "webkitSpeechError contained not allowed, you may need to allow microphone access" + "<br>\n" + logDiv.innerHTML;
+      }
+    }
+
+    this.webkitSR.onend = function() {
+      // logDiv.innerHTML = "speech quit, attempted restart..." + "<br>\n" + logDiv.innerHTML;
+      speechObj.webkitSR.start();
+    }
+
+    // finally start
+    this.final_transcript = " ";
+    this.webkitSR.lang = "en-US";
+    this.webkitSR.start();
+  } //end else there is webkit
+}
+
+
+</script>
+
+
